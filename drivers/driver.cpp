@@ -16,7 +16,12 @@
 #include "../shader/shader.h"
 #include "../solver/conjGrad_MKL.h"
 
-#define DIM 1024
+#include <CL/cl.h>
+#include <clAmdBlas.h>
+#include "../solver/conjGrad_OCL.h"
+
+
+#define DIM 512
 #define VERTEX_SHADER "shader/shader.vert"
 #define FRAGMENT_SHADER "shader/shader.frag"
 
@@ -27,6 +32,9 @@ GLuint a_TexCoordinate_handle;   //Program handle for the a_TexCoordinate variab
 GLuint u_Texture_handle;         //Program handle for the u_Texture variable
 GLuint texHandle;                //Program handle for the texture map
 int done=0;
+
+int choice;
+
 
 void init(void) {
    //initialize shader
@@ -51,7 +59,6 @@ void init(void) {
    // Create a texture of appropriate size with no data (R32F for unclamped floating point texture)
    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, DIM, DIM, 0, GL_RED, GL_FLOAT, 0x0000);
    shader.bind();
-
    
 }
 
@@ -71,63 +78,71 @@ const GLfloat glScreenRectTexCoords[] =
     1.0f, 0.0f};
 
 void display (void) {
-   //Array used to contain voltage values (passed to conjgrad then used as float texture)
-   static float * PXA = (float *)malloc(sizeof(float)*DIM*DIM);
+  //Array used to contain voltage values (passed to conjgrad then used as float texture)
+  static float * PXA = (float *)malloc(sizeof(float)*DIM*DIM);
    
-   //While conjGrad is still solving, send it PXA
-   if (!done) 
-     done = conjGrad(PXA,DIM);
+  //While conjGrad is still solving, send it PXA
+  if (!done) {
+    if (choice)
+    done=conjGradOCL(PXA,DIM);
+     else
+      done=conjGradMKL(PXA,DIM);
+  }
    
-   //OpenGL nonsense
-   glClearColor (0.0,0.0,0.0,1.0);
-   glClear (GL_COLOR_BUFFER_BIT);
-   glLoadIdentity();  
+  //OpenGL nonsense
+  glClearColor (0.0,0.0,0.0,1.0);
+  glClear (GL_COLOR_BUFFER_BIT);
+  glLoadIdentity();  
    
-   //Set up our texture
-   glActiveTexture(GL_TEXTURE0);
-   glBindTexture(GL_TEXTURE_2D, texHandle);
-   glUniform1i(u_Texture_handle, 0);
-   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, DIM, DIM, GL_RED, GL_FLOAT, PXA);
+  //Set up our texture
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, texHandle);
+  glUniform1i(u_Texture_handle, 0);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, DIM, DIM, GL_RED, GL_FLOAT, PXA);
    
-   //Pass the texture coordinates to the shader
-   glVertexAttribPointer(a_TexCoordinate_handle, 2, GL_FLOAT, GL_FALSE, 8, glScreenRectTexCoords);
-   glEnableVertexAttribArray(a_TexCoordinate_handle);
+  //Pass the texture coordinates to the shader
+  glVertexAttribPointer(a_TexCoordinate_handle, 2, GL_FLOAT, GL_FALSE, 8, glScreenRectTexCoords);
+  glEnableVertexAttribArray(a_TexCoordinate_handle);
    
-   //Pass the vertices to the shader
-   glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 8, glScreenRectVertices);
-   glEnableVertexAttribArray(gvPositionHandle);
+  //Pass the vertices to the shader
+  glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 8, glScreenRectVertices);
+  glEnableVertexAttribArray(gvPositionHandle);
 
-   //Draw
-   glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  //Draw
+  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
    
-   //Swap screen buffer
-   glutSwapBuffers();
+  //Swap screen buffer
+  glutSwapBuffers();
 }
 
 void reshape (int w, int h) {
-   glViewport (0, 0, (GLsizei)w, (GLsizei)h);
-   glMatrixMode (GL_PROJECTION);
-   glLoadIdentity ();
-   gluPerspective (60, (GLfloat)w / (GLfloat)h, 1.0, 100.0);
-   glMatrixMode (GL_MODELVIEW);
+  glViewport (0, 0, (GLsizei)w, (GLsizei)h);
+  glMatrixMode (GL_PROJECTION);
+  glLoadIdentity ();
+  gluPerspective (60, (GLfloat)w / (GLfloat)h, 1.0, 100.0);
+  glMatrixMode (GL_MODELVIEW);
 }
 
 int main (int argc, char **argv) {
-   glutInit(&argc, argv);
-   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA ); //set up the double buffering
-   glutInitWindowSize(DIM, DIM);
-   glutInitWindowPosition(100, 100);
-   glutCreateWindow("A basic OpenGL Window");
+  printf("Conjugate Gradient Solver for Poisson's Equation\n");
+  printf("Enter 0 for MKL or 1 for OpenCL\n");
+  
+  scanf("%d",&choice);
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA ); //set up the double buffering
+  glutInitWindowSize(DIM, DIM);
+  glutInitWindowPosition(100, 100);
+  glutCreateWindow("A basic OpenGL Window");
    
-   glutDisplayFunc(display);
-   glutIdleFunc(display);
+  glutDisplayFunc(display);
+  glutIdleFunc(display);
    
-   glutReshapeFunc(reshape);
-   GLenum err = glewInit();
-   init();
+  glutReshapeFunc(reshape);
+  GLenum err = glewInit();
+  init();
    
-   glutMainLoop();
-   
-   return 0;
+  glutMainLoop();
+  
+  return 0;
 }
 

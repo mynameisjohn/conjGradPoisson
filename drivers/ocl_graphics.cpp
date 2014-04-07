@@ -1,4 +1,5 @@
 #if ( (defined(__MACH__)) && (defined(__APPLE__)) )   
+
 #include <stdlib.h>
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
@@ -11,10 +12,13 @@
 #include <GL/glext.h>
 #endif
 
-#include "mkl.h"
+#include <CL/cl.h>
+#include <clAmdBlas.h>
+//#include "mkl.h"
 #include <omp.h>
 #include "../shader/shader.h"
-#include "../solver/conjGrad_MKL.h"
+//#include "../solver/conjGrad_MKL.h"
+#include "../solver/conjGrad_OCL.h"
 
 #define DIM 1024
 #define VERTEX_SHADER "shader/shader.vert"
@@ -76,7 +80,7 @@ void display (void) {
    
    //While conjGrad is still solving, send it PXA
    if (!done) 
-     done = conjGrad(PXA,DIM);
+     done = conjGradOCL(PXA,DIM);
    
    //OpenGL nonsense
    glClearColor (0.0,0.0,0.0,1.0);

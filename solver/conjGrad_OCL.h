@@ -1,20 +1,16 @@
-/**********************************************************************
-Copyright ©2013 Advanced Micro Devices, Inc. All rights reserved.
+/**
+conjGrad_OCL.h - A file containing functions capable of solving Poisson's Equation in 2-D using the method of Conjugate Gradients. The method is implemented using the clAmdBlas subroutines for linear algebra operations alongside a few kernels for performing convolutions and scalar operations. 
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+References:
+http://en.wikipedia.org/wiki/Conjugate_gradient_method
+http://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf
 
-•	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-•	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
+This code was essentially built off of the example_saxpy.cpp file from the clAmdBlas samples and the HelloWorld.cpp file from the OpenCL samples. 
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- OF USE, DATA, OR PROFITS; OR BUSINESS INTstatusUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-********************************************************************/
+A special thanks to Claudio Rebbi, my professor for Intermediate Mechanics and Computational Physics. 
 
-// For clarity,statusor checking has been omitted.
+   - John Joseph, 4/4/2014
+**/
 
 #include <CL/cl.h>
 #include <string.h>
@@ -26,25 +22,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <fstream>
 #include <clAmdBlas.h>
 
+#include "../misc/printFuncs.h"
 
 #define SUCCESS 0
 #define FAILURE 1
 
-//#define N 1024
-
 using namespace std;
-
-//Print matrix function
-void printMat(float * M, int n){
-   int i,j;
-   printf("{\n");
-   for (i=0;i<n;i++){
-      for (j=0;j<n;j++)
-         printf("%2.2f,",M[i*n+j]);
-      printf("\n");
-   }
-   printf("}\n\n");
-}
 
 //Initialize the boundary conditions
 int initBC(float * v, int * inside, int size){
@@ -53,7 +36,7 @@ int initBC(float * v, int * inside, int size){
     xc=(float)0.5, yc=(float)0.6, r=(float)0.125, xd=(float)0.35;
   float v1,v2,v3,v4,v5,v6,xa,ya;
 
-  v1=0.008f;
+  v1=0.008f; //charge density of square and cirlce 
   v2=0.008f;
   v3=-21.0f;
   v4=21.0f;
@@ -129,15 +112,7 @@ int convertToString(const char *filename, std::string& s)
    return FAILURE;
 }
 
-void print(float * x, int n){
-   int i=0;
-   printf("[");
-   for (i=0;i<n-1;i++)
-      printf("%lf, ",x[i]);
-   printf("%lf]\n",x[n-1]);
-   return;
-}
-
+//Method used for timing OpenCL events
 double timeIt(cl_command_queue commandQueue, cl_event event){
    cl_ulong time_start, time_end;
    clFinish(commandQueue);
@@ -148,22 +123,29 @@ double timeIt(cl_command_queue commandQueue, cl_event event){
    return time_end - time_start;
 }
 
-
-int solve(float * x, int N)
+//Solve Poisson's equation via conjugate gradient using OpenCL and clBlas
+int conjGradOCL(float * x, int N)
 {
+   //OpenCL buffers (used to store information on the device)
    cl_mem buf_b, buf_x, buf_r0, buf_rN, buf_p0, buf_pN, buf_tmp, buf_scratch;
    cl_mem buf_scalars;
-   cl_float scalars [3];
+
+   //Boundary Conditions (host side)
    cl_float * b = (cl_float *)malloc(sizeof(cl_float)*N*N);
    int * inside = (int *)malloc(sizeof(int)*N*N);
 
+   //Initialization condition
+   static int initialized = 0;
+
+   //Global Work groups for the three kernels
    size_t divideGWs[1] = {1};
    size_t scaleGWs[1] = {N*N};
    size_t convolveGWs[2] = {N,N};
 
+   //Event, used mainly for profiling
    cl_event event = NULL;
-   int ret = 0;
 
+   //Total execution time
    double total_time=0;
 
    /*Step1: Getting platforms and choose an available one.*/
@@ -207,7 +189,7 @@ int solve(float * x, int N)
    cl_context context = clCreateContext(NULL,1, devices,NULL,NULL,NULL);
    
    /*Step 4: Creating command queue associate with the context.*/
-   cl_command_queue commandQueue = clCreateCommandQueue(context, devices[0], CL_QUEUE_PROFILING_ENABLE, &status);
+   cl_command_queue commandQueue = clCreateCommandQueue(context, devices[0], 0, &status);
 
    /* Setup clAmdBlas. */
    status = clAmdBlasSetup();
@@ -217,10 +199,6 @@ int solve(float * x, int N)
       clReleaseContext(context);
       return 1;
    }
-
-   static int initialized = 0;
-
-   scalars[1]=1;
 
    /* Prepare OpenCL memory objects and place matrices inside them. */
    buf_b       = clCreateBuffer(context, CL_MEM_READ_ONLY, (N*N*sizeof(cl_float)), NULL, &status);
@@ -254,129 +232,104 @@ int solve(float * x, int N)
    status = clSetKernelArg(scaleKernel,2,sizeof(cl_mem),(void *)&buf_scalars);
 
    cl_kernel convolveKernel = clCreateKernel(program,"convolve",NULL);
-   cl_kernel convolveKernel_a = clCreateKernel(program,"convolve_a",NULL);
    cl_kernel convolveKernel_b = clCreateKernel(program,"convolve_b",NULL);
-   cl_kernel convolveKernel_c = clCreateKernel(program,"convolve_c",NULL);
 
+   //Current and max iteration step
    int step=0,max=2000;
 
+   //Sync up the command queue
    clFinish(commandQueue);
 
+   //Iteration loop
    while (step<=max){
+      //Initialization (only called once)
       if (!initialized){
          //Initialize Boundary Conditions
          initBC(b,inside,N);
          status = clEnqueueWriteBuffer(commandQueue, buf_b, CL_TRUE, 0, (N*N*sizeof(cl_float)), b, 0, NULL, &event);
-         total_time+=timeIt(commandQueue,event);
          status = clEnqueueWriteBuffer(commandQueue, buf_x, CL_TRUE, 0, (N*N*sizeof(cl_float)), x, 0, NULL, &event);
-         total_time+=timeIt(commandQueue,event);
 
          //r0=b-Ax
          status = clAmdBlasScopy(N*N,buf_b,0,1,buf_r0,0,1,1,&commandQueue,0,NULL,&event);  
-         total_time+=timeIt(commandQueue,event); 
          status = clSetKernelArg(convolveKernel_b,0,sizeof(cl_mem),(void *)&buf_x);
          status = clSetKernelArg(convolveKernel_b,1,sizeof(cl_mem),(void *)&buf_r0);
          status = clEnqueueNDRangeKernel(commandQueue, convolveKernel_b, 2, NULL, convolveGWs, NULL, 0, NULL, &event);
-         total_time+=timeIt(commandQueue,event);
 
          //p0=r0      
          status = clAmdBlasScopy(N*N,buf_r0,0,1,buf_p0,0,1,1,&commandQueue,0,NULL,&event);
-         total_time+=timeIt(commandQueue,event);
 
          //buf_scalars[1]=numerator of alpha
          status = clAmdBlasSdot(N*N,buf_scalars,1,buf_r0,0,1,buf_r0,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
-         total_time+=timeIt(commandQueue,event);
          
          //tmp=A*p0
          status = clSetKernelArg(convolveKernel,0,sizeof(cl_mem),(void *)&buf_p0);
          status = clSetKernelArg(convolveKernel,1,sizeof(cl_mem),(void *)&buf_tmp);
          status = clEnqueueNDRangeKernel(commandQueue, convolveKernel, 2, NULL, convolveGWs, NULL, 0, NULL, &event);
-         total_time+=timeIt(commandQueue,event);
-         printf("%d\n",status);
+
          //buf_scalars[2]=denominator of alpha
          status = clAmdBlasSdot(N*N,buf_scalars,2,buf_p0,0,1,buf_tmp,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
-         total_time+=timeIt(commandQueue,event);
          
          //buf_scalars[0]=alpha
          status = clEnqueueNDRangeKernel(commandQueue, divideKernel, 1, NULL, divideGWs, NULL, 0, NULL, &event);
-         total_time+=timeIt(commandQueue,event);
 
+         //r0=rN
          status = clAmdBlasScopy(N*N,buf_r0,0,1,buf_rN,0,1,1,&commandQueue,0,NULL,&event);
-         total_time+=timeIt(commandQueue,event);
 
          initialized=1;
       }
 
       //pN=alpha*p0
       status = clEnqueueNDRangeKernel(commandQueue, scaleKernel, 1, NULL, scaleGWs, NULL, 0, NULL, &event);
-      total_time+=timeIt(commandQueue,event);
 
       //x+=pN
       status = clAmdBlasSaxpy(N*N,1.0,buf_pN,0,1,buf_x,0,1,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
 
-      //rN=r0-a*A*p0
-      //status = clAmdBlasScopy(N*N,buf_r0,0,1,buf_rN,0,1,1,&commandQueue,0,NULL,&event);
+      //rN-=A*pN
       status = clSetKernelArg(convolveKernel_b,0,sizeof(cl_mem),(void *)&buf_pN);
       status = clSetKernelArg(convolveKernel_b,1,sizeof(cl_mem),(void *)&buf_rN);
       status = clEnqueueNDRangeKernel(commandQueue, convolveKernel_b, 2, NULL, convolveGWs, NULL, 0, NULL, &event);
-      total_time+=timeIt(commandQueue,event);
       
       //buf_scalars[1]=numerator of beta
-      status = clAmdBlasSdot(N*N,buf_scalars,1,buf_rN,0,1,buf_rN,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);  
-      total_time+=timeIt(commandQueue,event);
+      status = clAmdBlasSdot(N*N,buf_scalars,1,buf_rN,0,1,buf_rN,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
+
       //buf_scalars[2]=denominator of beta
       status = clAmdBlasSdot(N*N,buf_scalars,2,buf_r0,0,1,buf_r0,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
+
       //buf_scalars[0]=beta
       status = clEnqueueNDRangeKernel(commandQueue, divideKernel, 1, NULL, divideGWs, NULL, 0, NULL, &event);
-      total_time+=timeIt(commandQueue,event);
 
       //pN=beta*p0
       status = clEnqueueNDRangeKernel(commandQueue, scaleKernel, 1, NULL, scaleGWs, NULL, 0, NULL, &event);
-      total_time+=timeIt(commandQueue,event);
+
       //pN+=rN
       status = clAmdBlasSaxpy(N*N,1.0,buf_rN,0,1,buf_pN,0,1,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
 
       //buf_scalars[1]=numerator of alpha
       status = clAmdBlasSdot(N*N,buf_scalars,1,buf_rN,0,1,buf_rN,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
 
       //buf_scalars[2]=denominator of alpha
       status = clSetKernelArg(convolveKernel,0,sizeof(cl_mem),(void *)&buf_pN);
       status = clSetKernelArg(convolveKernel,1,sizeof(cl_mem),(void *)&buf_tmp);
       status = clEnqueueNDRangeKernel(commandQueue, convolveKernel, 2, NULL, convolveGWs, NULL, 0, NULL, &event);
-      total_time+=timeIt(commandQueue,event);
       
       status = clAmdBlasSdot(N*N,buf_scalars,2,buf_pN,0,1,buf_tmp,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
       
       //buf_scalars[0]=alpha
       status = clEnqueueNDRangeKernel(commandQueue, divideKernel, 1, NULL, divideGWs, NULL, 0, NULL, &event);
-      total_time+=timeIt(commandQueue,event);
 
       //r0=rN
       status = clAmdBlasScopy(N*N,buf_rN,0,1,buf_r0,0,1,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
+
       //p0=pN
       status = clAmdBlasScopy(N*N,buf_pN,0,1,buf_p0,0,1,1,&commandQueue,0,NULL,&event);
-      total_time+=timeIt(commandQueue,event);
 
       step++;
    }
    
-   
    //Read back x
    status = clEnqueueReadBuffer(commandQueue, buf_x, CL_TRUE, 0, N*N*sizeof(cl_float), x, 0, NULL, &event);
-   total_time+=timeIt(commandQueue,event);
-   /*
-   clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
-   total_time = time_end - time_start;
-   printf("\nExecution time in milliseconds = %0.3f ms\n", (total_time / 1000000000000.0) );
-*/
-   
-   printf("\nExecution time in milliseconds = %0.3f ms\n", (total_time / 1000000.0) );
+
+   //Free host arrays
    free(b);
    free(inside);
 
@@ -395,9 +348,7 @@ int solve(float * x, int N)
    status = clReleaseKernel(divideKernel);
    status = clReleaseKernel(scaleKernel);
    status = clReleaseKernel(convolveKernel);
-   status = clReleaseKernel(convolveKernel_a);
    status = clReleaseKernel(convolveKernel_b);
-   status = clReleaseKernel(convolveKernel_c);
    status = clReleaseProgram(program);				//Release the program object.
    status = clReleaseCommandQueue(commandQueue);	//Release  Command queue.
    status = clReleaseContext(context);				//Release context.
@@ -410,7 +361,6 @@ int solve(float * x, int N)
       free(devices);
       devices = NULL;
    }
-
-   std::cout<<"Passed!\n";
+   
    return 1;
 }
