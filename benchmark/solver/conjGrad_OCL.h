@@ -33,7 +33,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //#define N 1024
 
 using namespace std;
-
+/*
 //Print matrix function
 void printMat(float * M, int n){
    int i,j;
@@ -45,7 +45,7 @@ void printMat(float * M, int n){
    }
    printf("}\n\n");
 }
-
+*/
 //Initialize the boundary conditions
 int initBC(float * v, int * inside, int size){
   int x,y;
@@ -128,7 +128,7 @@ int convertToString(const char *filename, std::string& s)
    cout<<"statusor: failed to open file\n:"<<filename<<endl;
    return FAILURE;
 }
-
+/*
 void print(float * x, int n){
    int i=0;
    printf("[");
@@ -138,6 +138,15 @@ void print(float * x, int n){
    return;
 }
 
+void print(double * x, int n){
+   int i=0;
+   printf("[");
+   for (i=0;i<n-1;i++)
+      printf("%lf, ",x[i]);
+   printf("%lf]\n",x[n-1]);
+   return;
+}
+*/
 double timeIt(cl_command_queue commandQueue, cl_event event){
    cl_ulong time_start, time_end;
    clFinish(commandQueue);
@@ -149,7 +158,7 @@ double timeIt(cl_command_queue commandQueue, cl_event event){
 }
 
 
-int solve(float * x, int N)
+double conjGradOCL(float * x, int N)
 {
    cl_mem buf_b, buf_x, buf_r0, buf_rN, buf_p0, buf_pN, buf_tmp, buf_scratch;
    cl_mem buf_scalars;
@@ -292,8 +301,7 @@ int solve(float * x, int N)
          status = clSetKernelArg(convolveKernel,1,sizeof(cl_mem),(void *)&buf_tmp);
          status = clEnqueueNDRangeKernel(commandQueue, convolveKernel, 2, NULL, convolveGWs, NULL, 0, NULL, &event);
          total_time+=timeIt(commandQueue,event);
-         printf("%d\n",status);
-         //buf_scalars[2]=denominator of alpha
+
          status = clAmdBlasSdot(N*N,buf_scalars,2,buf_p0,0,1,buf_tmp,0,1,buf_scratch,1,&commandQueue,0,NULL,&event);
          total_time+=timeIt(commandQueue,event);
          
@@ -375,8 +383,9 @@ int solve(float * x, int N)
    total_time = time_end - time_start;
    printf("\nExecution time in milliseconds = %0.3f ms\n", (total_time / 1000000000000.0) );
 */
+
+   total_time /= 1000000.0;
    
-   printf("\nExecution time in milliseconds = %0.3f ms\n", (total_time / 1000000.0) );
    free(b);
    free(inside);
 
@@ -410,7 +419,43 @@ int solve(float * x, int N)
       free(devices);
       devices = NULL;
    }
+   return total_time;
+}
 
-   std::cout<<"Passed!\n";
+int benchmarkOCL(){
+   int n,i; float * x;
+   double * OCL_time = (double *)calloc(4,sizeof(double)),navg=5;
+   
+   //Test 1
+   n=1024;
+   x = (float *)malloc(sizeof(float)*n*n);
+   for (i=0;i<(int)navg;i++)
+      OCL_time[0]+=conjGradOCL(x,n);
+   OCL_time[0]/=navg;
+   free(x);
+
+   n=512;
+   x = (float *)malloc(sizeof(float)*n*n);
+   for (i=0;i<(int)navg;i++)
+      OCL_time[1]+=conjGradOCL(x,n);
+   OCL_time[1]/=navg;
+   free(x);
+
+   n=256;
+   x = (float *)malloc(sizeof(float)*n*n);
+   for (i=0;i<(int)navg;i++)
+      OCL_time[2]+=conjGradOCL(x,n);
+   OCL_time[2]/=navg;
+   free(x);
+
+   n=128;
+   x = (float *)malloc(sizeof(float)*n*n);
+   for (i=0;i<(int)navg;i++)
+      OCL_time[3]+=conjGradOCL(x,n);
+   OCL_time[3]/=navg;
+   free(x);
+
+   print(OCL_time,4);
+   free(OCL_time);
    return 1;
 }

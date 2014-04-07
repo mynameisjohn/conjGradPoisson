@@ -4,7 +4,7 @@
 #include "mkl.h"
 #include <omp.h>
 
-#define N 1000
+#define N 1024
 
 //No longer needed
 void v2pxa(int * pxa, float * v, int * inside, int size){
@@ -90,7 +90,7 @@ void printMat(float * M, int n){
    printf("{\n");
    for (i=0;i<n;i++){
       for (j=0;j<n;j++)
-         printf("%6.2f,",M[i*n+j]);
+         printf("%2.2f,",M[i*n+j]);
       printf("\n");
    }
    printf("}\n\n");
@@ -181,6 +181,20 @@ float vTxMxv_alt(float *M, float *v, int n){
    return result;
 }
 
+void debug(){
+   float * I = (float *) calloc(16,sizeof(float));
+   float * x = (float *) calloc(16,sizeof(float));
+   int i;
+   for (i=0;i<4;i++)
+      I[i*4+i]=1.0f;
+   printMat(I,4);
+   convolve(I,x,4);
+   printMat(x,4);
+   free(I);
+   free(x);
+   return;
+}
+
 //Solve Poisson's eqn, store result in x
 int conjGrad(float * x){
 
@@ -194,7 +208,7 @@ int conjGrad(float * x){
    //float alpha=0,beta=0,error;
    static double start,finish,duration;
    int i,j,k;
-   int nstp=1,npr=200,max=2000,iter=0;;
+   int nstp=2000,npr=200,max=2000,iter=0;;
    
    if (!initialized){
       omp_set_num_threads(4);
@@ -218,6 +232,8 @@ int conjGrad(float * x){
       //for (i=0;i<N*N;i++) x[i]=b[i];
       start=omp_get_wtime();
       residue(x,b,r,N);
+      //printMat(r,N);
+      debug();
       free(b);
    }
    //p,pN,r,rN
@@ -233,17 +249,19 @@ int conjGrad(float * x){
 	 error=cblas_sdot(N*N,r,1,r,1);
 	 cblas_scopy(N*N,r,1,p,1);
 	 alpha=cblas_sdot(N*N,r,1,r,1)/vTxMxv(p,N);
+	 cblas_scopy(N*N,r,1,rN,1);
+	 printf("%lf\n",alpha);
 	 //create arrays
       }
       while (iter<nstp){
       cblas_saxpy(N*N,alpha,p,1,x,1);
       convolve_A(p,pN,-alpha,N);
       //cblas_sgemv(CblasRowMajor,CblasNoTrans,N*N,N*N,-alpha,A,N*N,p,1,0.0,pN,1);
-      cblas_scopy(N*N,r,1,rN,1);
+      //cblas_scopy(N*N,r,1,rN,1);
       cblas_saxpy(N*N,1.0,pN,1,rN,1);
       error=cblas_sdot(N*N,rN,1,rN,1);
       //if (error<0.00001) break;
-      if (step==max||error<0.00001){
+      if (step>=max){//||error<0.00001){
 	 finish=omp_get_wtime();
 	 printf("Solution found in %lf seconds with %d steps. \n",finish-start,step);
          mkl_free(p);
@@ -252,6 +270,7 @@ int conjGrad(float * x){
 	 //mkl_free(x);
 	 mkl_free(r);
 	 free(inside);
+	 printMat(x,4);
          return 1;
       }
       beta=cblas_sdot(N*N,rN,1,rN,1)/cblas_sdot(N*N,r,1,r,1);

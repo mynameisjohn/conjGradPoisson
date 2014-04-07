@@ -4,7 +4,7 @@
 #include "mkl.h"
 #include <omp.h>
 
-#define N 1024
+//#define N 1024
 
 //No longer needed
 void v2pxa(int * pxa, float * v, int * inside, int size){
@@ -106,6 +106,16 @@ void print(float * x, int n){
   return;
 }
 
+//Print vector function
+void print(double * x, int n){
+  int i=0;
+  printf("[");
+  for (i=0;i<n-1;i++)
+    printf("%lf, ",x[i]);
+  printf("%lf]\n",x[n-1]);
+  return;
+}
+
 //Laplacian convolution
 void convolve(float * x, float * xN, int n){
   int i,j;
@@ -195,109 +205,96 @@ void debug(){
    return;
 }
 
+
 //Solve Poisson's eqn, store result in x
-int conjGrad(float * x){
+double conjGradMKL(float * x, int N){
 
-   //mkl_set_num_threads(mkl_get_max_threads());
+  int initialized=0;
+  int step=0;
+  float *r = (float *)mkl_malloc(sizeof(float)*N*N,64); 
+  int * inside = (int *)malloc(sizeof(int)*N*N);
+  double start,finish;
+  int i,j,k;
+  int max=2000; 
 
-   static int initialized=0;
-   static int step=0;
-   static float *r;// = (float *)mkl_malloc(sizeof(float)*N*N,64); 
-   //static float * r = (float *)mkl_malloc(sizeof(float)*N*N,64);
-   static int * inside;// = (int *)malloc(sizeof(int)*N*N);
-   //float alpha=0,beta=0,error;
-   static double start,finish,duration;
-   int i,j,k;
-   int nstp=2000,npr=200,max=2000,iter=0;;
-   
-   if (!initialized){
-      omp_set_num_threads(4);
-      mkl_set_num_threads(4);
-      //x=(float *)mkl_malloc(sizeof(float)*N*N,64); 
-      r=(float *)mkl_malloc(sizeof(float)*N*N,64); 
-      inside=(int *)malloc(sizeof(int)*N*N);
+  //p,pN,r,rN
+  while (step<=max){
+    float * rN, * p, * pN;
+    float alpha;
+    float beta,error;
+    if (step==0){
       float * b = (float *)calloc(N*N,sizeof(float));
-
-      for (i=0;i<N*N;i++) inside[i]=1;
-
-      initialized=1;
-      //for (i=0;i<N*N;i++) x[i]=1;
-      //convolve(x,b,N);
-      //for (i=0;i<N*N;i++) x[i]=N*N-i;
-      //printMat(b,N);
-      //printf("fuck you\n"); 
-      //initialize(x,inside,N);
       initialize(b,inside,N);
-      //convolve_A(x,b,-1.0f,N);
-      //for (i=0;i<N*N;i++) x[i]=b[i];
       start=omp_get_wtime();
       residue(x,b,r,N);
-      //printMat(r,N);
-      debug();
       free(b);
-   }
-   //p,pN,r,rN
-   if (step<=max){
-      duration = omp_get_wtime();
-      static float * rN, * p, * pN;
-      static float alpha;
-      float beta,error;
-      if (step==0){
-	 rN = (float *)mkl_malloc(sizeof(float)*N*N,64);
-	 p = (float *)mkl_malloc(sizeof(float)*N*N,64); 
-	 pN = (float *)mkl_malloc(sizeof(float)*N*N,64);
-	 error=cblas_sdot(N*N,r,1,r,1);
-	 cblas_scopy(N*N,r,1,p,1);
-	 alpha=cblas_sdot(N*N,r,1,r,1)/vTxMxv(p,N);
-	 cblas_scopy(N*N,r,1,rN,1);
-	 printf("%lf\n",alpha);
-	 //create arrays
-      }
-      while (iter<nstp){
-      cblas_saxpy(N*N,alpha,p,1,x,1);
-      convolve_A(p,pN,-alpha,N);
-      //cblas_sgemv(CblasRowMajor,CblasNoTrans,N*N,N*N,-alpha,A,N*N,p,1,0.0,pN,1);
-      //cblas_scopy(N*N,r,1,rN,1);
-      cblas_saxpy(N*N,1.0,pN,1,rN,1);
-      error=cblas_sdot(N*N,rN,1,rN,1);
-      //if (error<0.00001) break;
-      if (step>=max){//||error<0.00001){
-	 finish=omp_get_wtime();
-	 printf("Solution found in %lf seconds with %d steps. \n",finish-start,step);
-         mkl_free(p);
-         mkl_free(rN);
-         mkl_free(pN);
-	 //mkl_free(x);
-	 mkl_free(r);
-	 free(inside);
-	 printMat(x,4);
-         return 1;
-      }
-      beta=cblas_sdot(N*N,rN,1,rN,1)/cblas_sdot(N*N,r,1,r,1);
-      cblas_scopy(N*N,rN,1,pN,1);
-      cblas_saxpy(N*N,beta,p,1,pN,1);
-      alpha=cblas_sdot(N*N,rN,1,rN,1)/vTxMxv(pN,N);
-      cblas_scopy(N*N,rN,1,r,1);
-      cblas_scopy(N*N,pN,1,p,1);
-      //printf("%lf\n",error);
-      step++; 
-      iter++;
-      }
-      iter=0;
-      //printf("%d iteration(s) to %lf seconds. \n",nstp,omp_get_wtime()-duration);
 
-      //if j is max, free arrays
-   }
-   //finish=omp_get_wtime();
-						     
-   //printMat(x,N);
-   //printMat(b,N);
-   //printf("%d, %lf\n",step,finish-start);
-   //double colorTime =  omp_get_wtime();
+      rN = (float *)mkl_malloc(sizeof(float)*N*N,64);
+      p  = (float *)mkl_malloc(sizeof(float)*N*N,64); 
+      pN = (float *)mkl_malloc(sizeof(float)*N*N,64);
+      error=cblas_sdot(N*N,r,1,r,1);
+      cblas_scopy(N*N,r,1,p,1);
+      alpha=cblas_sdot(N*N,r,1,r,1)/vTxMxv(p,N);
+      cblas_scopy(N*N,r,1,rN,1);
+    }
+    cblas_saxpy(N*N,alpha,p,1,x,1);
+    convolve_A(p,pN,-alpha,N);
+    cblas_saxpy(N*N,1.0,pN,1,rN,1);
+    error=cblas_sdot(N*N,rN,1,rN,1);
+    if (step==max){
+      finish=omp_get_wtime();
+      mkl_free(p);
+      mkl_free(rN);
+      mkl_free(pN);
+      mkl_free(r);
+      free(inside);
+      return (finish-start);
+    }
+    beta=cblas_sdot(N*N,rN,1,rN,1)/cblas_sdot(N*N,r,1,r,1);
+    cblas_scopy(N*N,rN,1,pN,1);
+    cblas_saxpy(N*N,beta,p,1,pN,1);
+    alpha=cblas_sdot(N*N,rN,1,rN,1)/vTxMxv(pN,N);
+    cblas_scopy(N*N,rN,1,r,1);
+    cblas_scopy(N*N,pN,1,p,1);
+    step++; 
+  }
+  return 1;
+}
 
-   //v2pxa(pxa,x,inside,N);
-   //printf("%lf\n",omp_get_wtime()-colorTime);
-   //mkl_free(x);
-   //mkl_free(r);
-   return 0;
+
+int benchmarkMKL(){
+   int n,i; float * x;
+   double * MKL_time = (double *)calloc(4,sizeof(double)),navg=5;
+
+  omp_set_num_threads(4);
+  mkl_set_num_threads(4);
+   
+   //Test 1
+   n=1024;
+   x = (float *)mkl_malloc(sizeof(float)*n*n,64);
+   for (i=0;i<(int)navg;i++)
+      MKL_time[0]+=conjGradMKL(x,n)/navg;
+   mkl_free(x);
+
+   n=512;
+   x=(float *)mkl_malloc(sizeof(float)*n*n,64);
+   for (i=0;i<(int)navg;i++)
+      MKL_time[1]+=conjGradMKL(x,n)/navg;
+   mkl_free(x);
+
+   n=256;
+   x=(float *)mkl_malloc(sizeof(float)*n*n,64);
+   for (i=0;i<(int)navg;i++)
+      MKL_time[2]+=conjGradMKL(x,n)/navg;
+   mkl_free(x);
+
+   n=128;
+   x=(float *)mkl_malloc(sizeof(float)*n*n,64);
+   for (i=0;i<(int)navg;i++)
+      MKL_time[3]+=conjGradMKL(x,n)/navg;
+   mkl_free(x);
+
+   print(MKL_time,4);
+   free(MKL_time);
+   return 1;
 }
