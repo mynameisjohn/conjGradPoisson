@@ -21,7 +21,7 @@
 #include "../solver/conjGrad_OCL.h"
 
 
-#define DIM 512
+//#define DIM 512
 #define VERTEX_SHADER "shader/shader.vert"
 #define FRAGMENT_SHADER "shader/shader.frag"
 
@@ -32,7 +32,7 @@ GLuint a_TexCoordinate_handle;   //Program handle for the a_TexCoordinate variab
 GLuint u_Texture_handle;         //Program handle for the u_Texture variable
 GLuint texHandle;                //Program handle for the texture map
 int done=0;
-
+int DIM=512;
 int choice;
 
 
@@ -125,9 +125,13 @@ void reshape (int w, int h) {
 
 int main (int argc, char **argv) {
   printf("Conjugate Gradient Solver for Poisson's Equation\n");
-  printf("Enter 0 for MKL or 1 for OpenCL\n");
-  
-  scanf("%d",&choice);
+
+  printf("Enter 0 for MKL or 1 for OpenCL\n");  
+  if (scanf("%d",&choice) != 1) choice=0;
+
+  printf("Enter the grid dimension\n");
+  if (scanf("%d",&DIM) != 1) DIM=512;
+
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA ); //set up the double buffering
   glutInitWindowSize(DIM, DIM);

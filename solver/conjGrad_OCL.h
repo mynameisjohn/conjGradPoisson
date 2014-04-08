@@ -213,7 +213,7 @@ int conjGradOCL(float * x, int N)
    buf_scalars = clCreateBuffer(context, CL_MEM_READ_WRITE, 3*sizeof(cl_float), NULL, &status);
 
    /*Step 5: Create program object */
-   const char *filename = "solver/scalarKernel.cl";
+   const char *filename = "solver/cl/conjGradKernel.cl";
    string sourceStr;
    status = convertToString(filename, sourceStr);
    const char *source = sourceStr.c_str();

@@ -241,14 +241,14 @@ double conjGradMKL(float * x, int N){
     convolve_A(p,pN,-alpha,N);
     cblas_saxpy(N*N,1.0,pN,1,rN,1);
     error=cblas_sdot(N*N,rN,1,rN,1);
-    if (step==max){
+    if (step==max){//||error<0.00001){
       finish=omp_get_wtime();
       mkl_free(p);
       mkl_free(rN);
       mkl_free(pN);
       mkl_free(r);
       free(inside);
-      return (finish-start);
+      return 1000.0*(finish-start);
     }
     beta=cblas_sdot(N*N,rN,1,rN,1)/cblas_sdot(N*N,r,1,r,1);
     cblas_scopy(N*N,rN,1,pN,1);
@@ -265,36 +265,51 @@ double conjGradMKL(float * x, int N){
 int benchmarkMKL(){
    int n,i; float * x;
    double * MKL_time = (double *)calloc(4,sizeof(double)),navg=5;
-
-  omp_set_num_threads(4);
-  mkl_set_num_threads(4);
+   FILE * data=fopen("data/MKLruntimes.txt","w");
    
-   //Test 1
+   omp_set_num_threads(4);
+   mkl_set_num_threads(4);
+   
    n=1024;
-   x = (float *)mkl_malloc(sizeof(float)*n*n,64);
-   for (i=0;i<(int)navg;i++)
+   for (i=0;i<(int)navg;i++){
+      x=(float *)mkl_calloc(n*n,sizeof(float),64);
       MKL_time[0]+=conjGradMKL(x,n)/navg;
-   mkl_free(x);
+      int j;
+      for (j=0;j<n*n;j++) x[i]=0.0;
+      mkl_free(x);
+   }
 
    n=512;
-   x=(float *)mkl_malloc(sizeof(float)*n*n,64);
-   for (i=0;i<(int)navg;i++)
+   for (i=0;i<(int)navg;i++){
+      x=(float *)mkl_calloc(n*n,sizeof(float),64);
       MKL_time[1]+=conjGradMKL(x,n)/navg;
-   mkl_free(x);
+      int j;
+      mkl_free(x);
+   }
 
    n=256;
-   x=(float *)mkl_malloc(sizeof(float)*n*n,64);
-   for (i=0;i<(int)navg;i++)
+   for (i=0;i<(int)navg;i++){
+      x=(float *)mkl_calloc(n*n,sizeof(float),64);
       MKL_time[2]+=conjGradMKL(x,n)/navg;
-   mkl_free(x);
-
+      int j;
+      mkl_free(x);
+   }
+   
    n=128;
-   x=(float *)mkl_malloc(sizeof(float)*n*n,64);
-   for (i=0;i<(int)navg;i++)
+   for (i=0;i<(int)navg;i++){
+      x=(float *)mkl_calloc(n*n,sizeof(float),64);
       MKL_time[3]+=conjGradMKL(x,n)/navg;
-   mkl_free(x);
+      int j;
+      mkl_free(x);
+   }
 
-   print(MKL_time,4);
+   fprintf(data,"%d\t%lf\n%d\t%lf\n%d\t%lf\n%d\t%lf\n",
+                 1024,MKL_time[0],
+                 512, MKL_time[1],
+                 256, MKL_time[2],
+                 128, MKL_time[3]);
+   fclose(data);
+
    free(MKL_time);
    return 1;
 }

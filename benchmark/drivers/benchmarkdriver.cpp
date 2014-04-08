@@ -20,7 +20,7 @@
 #include <clAmdBlas.h>
 #include "../solver/conjGrad_OCL.h"
 
-#define DIM 512
+#define DIM 256
 #define VERTEX_SHADER "shader/shader.vert"
 #define FRAGMENT_SHADER "shader/shader.frag"
 
@@ -77,13 +77,15 @@ void display (void) {
    //Array used to contain voltage values (passed to conjgrad then used as float texture)
    static float * PXA = (float *)malloc(sizeof(float)*DIM*DIM);
    
-   //While conjGrad is still solving, send it PXA
+   //Run the tests
    if (!done) {
-     
-     
-     benchmarkMKL();
-     benchmarkOCL();
-     done=conjGradMKL(PXA,DIM);
+      printf("Beginning MKL phase\n");
+      benchmarkMKL();
+      printf("Beginning OCL phase\n");
+      benchmarkOCL();
+      conjGradMKL(PXA,DIM);
+      printf("Done\n");
+      done=1;
    }
    
    //OpenGL nonsense
@@ -121,13 +123,13 @@ void reshape (int w, int h) {
 }
 
 int main (int argc, char **argv) {
-  printf("Benchmarking: The system will be solved for several times for several input sizes. This may take some time. Continue? ");
-  printf(" y / n \n ");
+  printf("Benchmarking: The system will be solved for several times for several input sizes. This may take some time. \nContinue? ");
+  printf("y / n\n");
   char c;
-  scanf("%c",&c);
-  if (c!='y'){
-    exit(0);
-  }
+  if (scanf("%c",&c))
+   if (c!='y')
+      exit(0);
+   printf("\nBeginning tests...\n"); 
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA ); //set up the double buffering
   glutInitWindowSize(DIM, DIM);

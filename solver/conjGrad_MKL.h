@@ -4,8 +4,10 @@
 #include "mkl.h"
 #include <omp.h>
 
+#define EPS 0.00001
+
 //Initialize the boundary conditions
-int initialize(float * v, int * inside, int size){
+int initBC(float * v, int size){
   int x,y;
   float x0=(float)0.25, x1=(float)0.75, y0=(float)0.25, y1=(float)0.35,
     xc=(float)0.5, yc=(float)0.6, r=(float)0.125, xd=(float)0.35;
@@ -22,34 +24,13 @@ int initialize(float * v, int * inside, int size){
     ya=((float)y)/((float)size);
     for (x=0;x<size;x++){
       xa=((float)x)/((float)size);
-      if (y==0){
-   v[y*size+x]=v5;
-   inside[y*size+x]=0;
-      }
-      if (y==size-1){
-   v[y*size+x]=v3;
-   inside[y*size+x]=0;
-      }
-      if (x==0){
-   v[y*size+x]=v6;
-   inside[y*size+x]=0;
-      }
-      if (x==size-1){
-   v[y*size+x]=v4;
-   inside[y*size+x]=0;
-   }
-      if (x0<=xa && xa<=x1 && y0<=ya && ya<=y1){
-   v[y*size+x]=v2;
-   inside[y*size+x]=0;
-      }
-      if (pow((xa-xc),2)+pow((ya-yc),2)<=r*r){
-   v[y*size+x]=-v1;
-   inside[y*size+x]=0;
-      }
-      if (pow((xa-xd),2)+pow((ya-yc),2)<=r*r){
-   v[y*size+x]=v1;
-   inside[y*size+x]=0;
-      }
+      if (y==0) v[y*size+x]=v5;
+      if (y==size-1) v[y*size+x]=v3;
+      if (x==0) v[y*size+x]=v6;
+      if (x==size-1) v[y*size+x]=v4;
+      if (x0<=xa && xa<=x1 && y0<=ya && ya<=y1)  v[y*size+x]=v2;
+      if (pow((xa-xc),2)+pow((ya-yc),2)<=r*r) v[y*size+x]=-v1;
+      if (pow((xa-xd),2)+pow((ya-yc),2)<=r*r) v[y*size+x]=v1;
     }
   }
 
@@ -124,7 +105,6 @@ int conjGradMKL(float * x, int N){
   static int initialized=0;
   static int step=0,max=2000,nstp=1;
   static float *r;
-  static int * inside;
   static double start,finish,duration;
   int i,j,k;
   int iter=0;
@@ -133,10 +113,9 @@ int conjGradMKL(float * x, int N){
     omp_set_num_threads(4);
     mkl_set_num_threads(4);
     r=(float *)mkl_malloc(sizeof(float)*N*N,64); 
-    inside=(int *)malloc(sizeof(int)*N*N);
     float * b = (float *)calloc(N*N,sizeof(float));
 
-    initialize(b,inside,N);
+    initBC(b,N);
     start=omp_get_wtime();
     residue(x,b,r,N);
     free(b);
@@ -163,14 +142,13 @@ int conjGradMKL(float * x, int N){
       convolve_A(p,pN,-alpha,N);
       cblas_saxpy(N*N,1.0,pN,1,rN,1);
       error=cblas_sdot(N*N,rN,1,rN,1);
-      if (step>=max){
+      if (step>=max || error<EPS){
         finish=omp_get_wtime();
         printf("Solution found in %lf seconds with %d steps. \n",finish-start,step);
         mkl_free(p);
         mkl_free(rN);
         mkl_free(pN);
         mkl_free(r);
-        free(inside);
         return 1;
       }
       beta=cblas_sdot(N*N,rN,1,rN,1)/cblas_sdot(N*N,r,1,r,1);

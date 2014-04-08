@@ -33,19 +33,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 //#define N 1024
 
 using namespace std;
-/*
-//Print matrix function
-void printMat(float * M, int n){
-   int i,j;
-   printf("{\n");
-   for (i=0;i<n;i++){
-      for (j=0;j<n;j++)
-         printf("%2.2f,",M[i*n+j]);
-      printf("\n");
-   }
-   printf("}\n\n");
-}
-*/
 //Initialize the boundary conditions
 int initBC(float * v, int * inside, int size){
   int x,y;
@@ -128,25 +115,7 @@ int convertToString(const char *filename, std::string& s)
    cout<<"statusor: failed to open file\n:"<<filename<<endl;
    return FAILURE;
 }
-/*
-void print(float * x, int n){
-   int i=0;
-   printf("[");
-   for (i=0;i<n-1;i++)
-      printf("%lf, ",x[i]);
-   printf("%lf]\n",x[n-1]);
-   return;
-}
 
-void print(double * x, int n){
-   int i=0;
-   printf("[");
-   for (i=0;i<n-1;i++)
-      printf("%lf, ",x[i]);
-   printf("%lf]\n",x[n-1]);
-   return;
-}
-*/
 double timeIt(cl_command_queue commandQueue, cl_event event){
    cl_ulong time_start, time_end;
    clFinish(commandQueue);
@@ -244,7 +213,7 @@ double conjGradOCL(float * x, int N)
    buf_scalars = clCreateBuffer(context, CL_MEM_READ_WRITE, 3*sizeof(cl_float), NULL, &status);
 
    /*Step 5: Create program object */
-   const char *filename = "solver/scalarKernel.cl";
+   const char *filename = "solver/cl/conjGradKernel.cl";
    string sourceStr;
    status = convertToString(filename, sourceStr);
    const char *source = sourceStr.c_str();
@@ -425,7 +394,8 @@ double conjGradOCL(float * x, int N)
 int benchmarkOCL(){
    int n,i; float * x;
    double * OCL_time = (double *)calloc(4,sizeof(double)),navg=5;
-   
+   FILE * data = fopen("data/OCLruntimes.txt","w");   
+
    //Test 1
    n=1024;
    x = (float *)malloc(sizeof(float)*n*n);
@@ -455,7 +425,12 @@ int benchmarkOCL(){
    OCL_time[3]/=navg;
    free(x);
 
-   print(OCL_time,4);
+   fprintf(data,"%d\t%lf\n%d\t%lf\n%d\t%lf\n%d\t%lf\n",
+	         1024,OCL_time[0],
+	         512, OCL_time[1],
+	         256, OCL_time[2],
+	         128, OCL_time[3]); 
+   fclose(data);
    free(OCL_time);
    return 1;
 }

@@ -16,7 +16,6 @@
 #include "../shader/shader.h"
 #include "../solver/conjGrad_MKL.h"
 
-#define DIM 1024
 #define VERTEX_SHADER "shader/shader.vert"
 #define FRAGMENT_SHADER "shader/shader.frag"
 
@@ -27,6 +26,7 @@ GLuint a_TexCoordinate_handle;   //Program handle for the a_TexCoordinate variab
 GLuint u_Texture_handle;         //Program handle for the u_Texture variable
 GLuint texHandle;                //Program handle for the texture map
 int done=0;
+int DIM=512;
 
 void init(void) {
    //initialize shader
@@ -76,7 +76,7 @@ void display (void) {
    
    //While conjGrad is still solving, send it PXA
    if (!done) 
-     done = conjGrad(PXA,DIM);
+     done = conjGradMKL(PXA,DIM);
    
    //OpenGL nonsense
    glClearColor (0.0,0.0,0.0,1.0);
@@ -113,6 +113,9 @@ void reshape (int w, int h) {
 }
 
 int main (int argc, char **argv) {
+   printf("Enter the grid dimension\n");
+   if (scanf("%d",&DIM) != 1) DIM=512;
+
    glutInit(&argc, argv);
    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA ); //set up the double buffering
    glutInitWindowSize(DIM, DIM);

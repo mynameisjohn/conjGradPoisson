@@ -1,5 +1,10 @@
+conjGrad Poisson - Solve Poisson's equation for the electrostatic potential of a 2-D system using the method of conjugate gradients. As of now the solver can implement both Intel MKL and OpenCL BLAS subroutines, although the laplacian convolution is implemented by me. 
+
+In order to run this, you must have Intel MKL and/or OpenCL/clBlas installed and running on your machine. Additionally, OpenGL/glut/GLEW are needed for visualization. Makefile included. 
+
+Special thanks to Swiftless for the GLSL framework and Claudio Rebbi for the foundation/inspiration to do this.
+
 TODO
 
 clean up code
 add opencl interop
-finalize benchmark
