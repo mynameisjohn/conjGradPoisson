@@ -1,35 +1,17 @@
-/**********************************************************************
-Copyright ©2013 Advanced Micro Devices, Inc. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-•	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-•	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-********************************************************************/
-__kernel void helloworld(__global char* in, __global char* out)
-{
-	int num = get_global_id(0);
-	out[num] = in[num] + 1;
-}
-
+//Simple Divid Kernel (divides two scalars)
 __kernel void divide(__global float * scalars)
 {
    scalars[0]=scalars[1]/scalars[2];
 }
 
+//Simple scale kernel
 __kernel void scale(__global float * v0, __global float * vN, __global float * a)
 {
    int idx = get_global_id(0);
    vN[idx]=a[0]*v0[idx];
 }
 
+//Laplacian Convolution
 __kernel void convolve(__global float * v0, __global float * vN)
 {
    int i = get_global_id(1);
@@ -44,6 +26,7 @@ __kernel void convolve(__global float * v0, __global float * vN)
       ((i==n-1) ? 0.0f : v0[((i+1)*n+j)]));
 }
 
+//Laplacian convolution using local memory
 __kernel void convolveLocal(__global float * v0, __global float * vN)
 {
    int i = get_global_id(1);
@@ -54,6 +37,7 @@ __kernel void convolveLocal(__global float * v0, __global float * vN)
    vN[i*n+j]=4.0f*v0[i*n+j]-(cached[0]+cached[1]+cached[2]+cached[3]);
 }
 
+//Laplacian Convolution with negative scale using local memory
 __kernel void convolveLocal_a(__global float * v0, __global float * vN, __global float * a)
 {
    int i = get_global_id(1);
@@ -63,6 +47,8 @@ __kernel void convolveLocal_a(__global float * v0, __global float * vN, __global
    float cached[4]= {((j==0)   ? 0.0f : v0[(i*n+j-1)]), ((j==n-1) ? 0.0f : v0[(i*n+j+1)]), ((i==0)   ? 0.0f : v0[((i-1)*n+j)]), ((i==0)   ? 0.0f : v0[((i-1)*n+j)])};
    vN[i*n+j]=-a[0]*(4.0f*v0[i*n+j]-(cached[0]+cached[1]+cached[2]+cached[3]));
 }
+
+//Laplacian convolution that subtracts, using local memory
 __kernel void convolveLocal_b(__global float * v0, __global float * vN)
 {
    int i = get_global_id(1);
@@ -73,6 +59,7 @@ __kernel void convolveLocal_b(__global float * v0, __global float * vN)
    vN[i*n+j]-=4.0f*v0[i*n+j]-(cached[0]+cached[1]+cached[2]+cached[3]);
 }
 
+//Laplacian convolution with negative scale
 __kernel void convolve_a(__global float * v0, __global float * vN, __global float * a)
 {
    int i = get_global_id(1);
@@ -88,6 +75,7 @@ __kernel void convolve_a(__global float * v0, __global float * vN, __global floa
 
 }
 
+//Laplacian convolution that subtracts
 __kernel void convolve_b(__global float * v0, __global float * vN)
 {
    int i = get_global_id(1);
@@ -113,6 +101,7 @@ __kernel void convolve_b(__global float * v0, __global float * vN)
       ((i==n-1) ? 0.0f : v0[((i+1)*n+j)]));
 }
 
+//Laplacian convolution that adds with positive scale
 __kernel void convolve_c(__global float * v0, __global float * vN, global float * a)
 {
    int i = get_global_id(1);
@@ -127,4 +116,3 @@ __kernel void convolve_c(__global float * v0, __global float * vN, global float 
       ((i==n-1) ? 0.0f : v0[((i+1)*n+j)])));
 
 }
-
