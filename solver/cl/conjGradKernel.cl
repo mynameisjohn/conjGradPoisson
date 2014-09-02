@@ -90,18 +90,7 @@ __kernel void convolve_b(__global float * v0, __global float * vN)
    int i = get_global_id(1);
    int j = get_global_id(0);
    int n = get_global_size(1);
-/*   float left = (float)(j!=0);
-   float right = (float)(j!=n);
-   float bottom = (float)(i!=0);
-   float top = (float)(i!=n);
 
-   vN[i*n+j]-=
-      4.0f*v0[i*n+j]-(
-         left*v0[(i*n+j-1)]+
-         right*v0[(i*n+j+1)]+
-         bottom*v0[((i-1)*n+j)]+
-         top*v0[((i+1)*n+j)]);
-  */ 
    vN[i*n+j]-=
       4.0f*v0[i*n+j]-(
       ((j==0) ? 0.0f : v0[(i*n+j-1)])+
