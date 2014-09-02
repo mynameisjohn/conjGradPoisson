@@ -1,3 +1,12 @@
+/*
+   These are several kernels using during the conjugate gradient algorithm. 
+   Note that there are several types of convolutions written (using local and global memory). The
+   reason for this is that the conjugat gradient algorithm has steps that involve adding or subtracting
+   a large matrix product. I used these kernels to combine that operation, potentially saving some time. 
+   
+   http://en.wikipedia.org/wiki/Conjugate_gradient_method#Numerical_example
+*/
+
 //Simple Divid Kernel (divides two scalars)
 __kernel void divide(__global float * scalars)
 {
