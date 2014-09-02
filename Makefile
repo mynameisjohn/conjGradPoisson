@@ -1,5 +1,7 @@
-#Change MKLHOME / OCL directories as needed
-#make (or make all): make a tool that chooses between MKL and OCL
+#Before running make, Change MKLHOME / OCL directories as needed
+# 
+#options:
+#make (or make all): make a tool that let's the user choosebetween MKL and OCL
 #make MKL_G: make MKL version of the tool
 #make OCL_G: Make OCL version of the tool
 
