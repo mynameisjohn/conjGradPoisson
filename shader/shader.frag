@@ -5,8 +5,8 @@ varying vec2 v_TexCoordinate;
 uniform sampler2D u_Texture;
 
 void main(){
-   vec4 test = texture2D(u_Texture,v_TexCoordinate);
-   float v = test.x;
+   vec4 voltageColor = texture2D(u_Texture,v_TexCoordinate);
+   float v = test.x; //red component of the color we passed in
    float t,r,g,b;
    t=(5.0f*(M_PI/2.0f-atan(v)))/3.0f;
    r=0.5f*(2.0f*cos(t)+1.0f);
