@@ -1,1 +1,25 @@
-set style fill solid; plot 'data/OCLruntimes.txt' using ($1-$1/(11.5)):2 with boxes lc rgb '#EE2929' title 'OCL Runtimes';set logscale x; set xtics (128,256,512,1024);set boxwidth 0.25 relative;set xrange [100:1300];set yrange [0:24000];replot 'data/MKLruntimes.txt' using ($1+$1/(11.5)):2 with boxes lc rgb '#38AAEC' title 'MKL Runtimes'; set title 'Conjugate Gradient Runtimes for MKL/clBlas'; set xlabel 'Grid Dimension'; set ylabel 'Runtime(ms)'; replot; set key top left; replot;
+set style fill solid; 
+
+plot 'data/OCLruntimes.txt' using ($1-$1/(11.5)):2 with boxes lc rgb '#EE2929' title 'OCL Runtimes';
+
+set logscale x; 
+
+set xtics (128,256,512,1024);
+
+set boxwidth 0.25 relative;
+
+set xrange [100:1300];
+
+set yrange [0:24000];
+
+replot 'data/MKLruntimes.txt' using ($1+$1/(11.5)):2 with boxes lc rgb '#38AAEC' title 'MKL Runtimes'; 
+
+set title 'Conjugate Gradient Runtimes for MKL/clBlas'; set xlabel 'Grid Dimension'; 
+
+set ylabel 'Runtime(ms)'; 
+
+replot; 
+
+set key top left; 
+
+replot;
