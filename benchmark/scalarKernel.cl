@@ -1,8 +1,10 @@
+//Used to divide two numbers
 __kernel void divide(__global float * scalars)
 {
    scalars[0]=scalars[1]/scalars[2];
 }
 
+//A simple scale operation
 __kernel void scale(__global float * v0, __global float * vN, __global float * a)
 {
    int idx = get_global_id(0);
@@ -23,7 +25,7 @@ __kernel void convolve(__global float * v0, __global float * vN)
       ((i==n-1) ? 0.0f : v0[((i+1)*n+j)]));
 }
 
-
+//Laplacian Convolution with a negative scale factor
 __kernel void convolve_a(__global float * v0, __global float * vN, global float * a)
 {
    int i = get_global_id(1);
@@ -39,6 +41,7 @@ __kernel void convolve_a(__global float * v0, __global float * vN, global float 
 
 }
 
+//Laplacian Convolution
 __kernel void convolve_b(__global float * v0, __global float * vN)
 {
    int i = get_global_id(1);
@@ -53,6 +56,7 @@ __kernel void convolve_b(__global float * v0, __global float * vN)
       ((i==n-1) ? 0.0f : v0[((i+1)*n+j)]));
 }
 
+//Laplacian Convolution with a positive scale factor
 __kernel void convolve_c(__global float * v0, __global float * vN, global float * a)
 {
    int i = get_global_id(1);
